@@ -11,5 +11,9 @@ adminRouter.patch('/approvecreditcard/request',tokenAuthentication,adminControll
 adminRouter.post('/addstaff',tokenAuthentication,multerMiddleware.single('imageurl'),adminController.addStaff)
 adminRouter.get('/getloan/requests',tokenAuthentication,adminController.getAllLoanRequests)
 adminRouter.patch('/approveloan',tokenAuthentication,adminController.approveLoan)
+adminRouter.get('/getStaffs',tokenAuthentication,adminController.getAllStaff)
+adminRouter.get('/getcreditcards/approved',tokenAuthentication,adminController.getAllApprovedCreditCards)
+adminRouter.post('/withdraw/:accno',tokenAuthentication,adminController.onWithdrawel)
+adminRouter.post('/withdrawOTP/:OTP',tokenAuthentication,adminController.onWithdrawelOTP)
 
 module.exports=adminRouter

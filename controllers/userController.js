@@ -37,7 +37,8 @@ exports.onRegister = async (req, res) => {
                     cardBalance: 1000,
                     cardTransactions: [],
                     cardExpiryDate: `${month.length >= 2 ? month : `0${month}/${year}`}`,
-                    status: "active"
+                    status: "active",
+                    penalty:0,
                 }
 
                 newUser.debitCard = bankdetails
@@ -678,3 +679,5 @@ exports.onLoanApplicatiion=async(req,res)=>{
 
 
 }
+
+

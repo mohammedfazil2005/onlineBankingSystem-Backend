@@ -3,6 +3,7 @@ require('dotenv').config()
 const express=require('express')
 const cors=require('cors')
 require('./databaseConnection/db')
+require('./scheduler/LoanSchedular')
 
 const userRouter=require('./routes/userRoute')
 const adminRouter=require('./routes/adminRoute')
