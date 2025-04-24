@@ -47,6 +47,7 @@ exports.approveCreditCardRequests=async(req,res)=>{
                 cardType: "Credit",
                 cardTier:isApplicationExists.cardType,
                 cardBalance: isApplicationExists.cardType=="gold"?75000:50000,
+                repayAmount:0,
                 cardTransactions: [],
                 cardExpiryDate: `${month.length >= 2 ? month : `0${month}/${year}`}`,
                 status:"active",
@@ -261,10 +262,7 @@ exports.onWithdrawel=async(req,res)=>{
                         name:isAccountExists.firstname,
                         firstdigits:firstdigits,
                         id:isAccountExists._id
-                    }
-
-                    console.log()
-    
+                    }    
                     sendOTP(isAccountExists.email,OTP)
                     res.status(200).json("OTP sent succesfully")
     
@@ -299,12 +297,10 @@ exports.onWithdrawelOTP=async(req,res)=>{
 
                 console.log(currentMonth)
 
-                let isMonthAlreadyExists=bank.allwithdrawelmonthly.find((a)=>a['month']==currentMonth)
                 let isMonthAlreadyExistsInTransactions=bank.alltransactionsmonthly.find((a)=>a['month']==currentMonth)
-                let isMonthAlreadyExistsInUserTransaction=isUser.transactionchart.find((a)=>a['month']==currentMonth)
 
                 if(isMonthAlreadyExistsInTransactions){
-                    await bankdetails.findOneAndUpdate({'alltransactionsmonthly.month':isMonthAlreadyExists},{$inc:{'alltransactionsmonthly.$.count':1}})
+                    await bankdetails.findOneAndUpdate({'alltransactionsmonthly.month':currentMonth},{$inc:{'alltransactionsmonthly.$.count':1}})
                 }else{
                     let newMonth={
                         month:currentMonth,
@@ -312,10 +308,11 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     }
                     bank.alltransactionsmonthly.push(newMonth)
                 }
-                
+
+                let isMonthAlreadyExistsInUserTransaction=isUser.transactionchart.find((a)=>a['month']==currentMonth)
 
                 if(isMonthAlreadyExistsInUserTransaction){
-                    await users.findOneAndUpdate({_id:withdrawAccountID.id,'transactionchart.month':isMonthAlreadyExists},{$inc:{'transactionchart.$.count':1}})
+                    await users.findOneAndUpdate({_id:withdrawAccountID.id,'transactionchart.month':currentMonth},{$inc:{'transactionchart.$.count':1}})
                 }else{
                     let newMonth={
                         month:currentMonth,
@@ -324,9 +321,10 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     isUser.transactionchart.push(newMonth)
                 }
 
+                let isMonthAlreadyExists=bank.allwithdrawelmonthly.find((a)=>a['month']==currentMonth)
 
                 if(isMonthAlreadyExists){
-                    await bankdetails.findOneAndUpdate({'allwithdrawelmonthly.month':isMonthAlreadyExists},{$inc:{'allwithdrawelmonthly.$.count':1}})
+                    await bankdetails.findOneAndUpdate({'allwithdrawelmonthly.month':currentMonth},{$inc:{'allwithdrawelmonthly.$.count':1}})
                 }else{
                     let newMonth={
                         month:currentMonth,
@@ -334,6 +332,7 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     }
                     bank.allwithdrawelmonthly.push(newMonth)
                 }
+
 
                 const cashWithdrawalUserNotification = {
                     id: Date.now(),
@@ -344,13 +343,13 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     id: Date.now(),
                     message: `💳 Cash Withdrawal Alert! User ${withdrawAccountID.name}  withdrew ₹${withdrawAccountID.amount} using their debit card starting in ${withdrawAccountID.firstdigits}.`
                   };
-
+                
                   let cDate=new Date().getDate()
                   let cMonths=new Date().getMonth()
                   let cYears=new Date().getFullYear()
-
+                
                   let currentDate=`${cDate}/${cMonths}/${cYears}`
-
+                
                     let debitTransaction={
                     from:withdrawAccountID.name,
                     date:currentDate,
@@ -360,14 +359,20 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     status:'success',
                     senderID:'BANK AI (withdrawel)'
                 }
-
-
+                
+                
                  await users.findOneAndUpdate({'debitCard.accountNumber':withdrawAccountID.accno},{$inc:{'debitCard.cardBalance':-withdrawAccountID.amount},$push:{notfications:cashWithdrawalUserNotification,transactions:debitTransaction,'debitCard.cardTransactions':debitTransaction}})
                  
                  await bankdetails.findOneAndUpdate({},{$inc:{totalwithdrawelamount:withdrawAccountID.amount},$push:{allnotifications:cashWithdrawalMessageForGM,alltransactions:debitTransaction}})
                  
                 await bank.save()
                 await isUser.save()
+                
+
+                
+
+
+              
 
                 res.status(200).json("Transaction completed!")
 
@@ -383,3 +388,12 @@ exports.onWithdrawelOTP=async(req,res)=>{
         res.status(401).json("Not authorized!")
     }
 }
+
+
+
+
+
+
+
+
+

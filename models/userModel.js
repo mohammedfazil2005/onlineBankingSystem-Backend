@@ -11,7 +11,7 @@ const userSchema=new mongoose.Schema({
     email:{type:String,required:true},
     password:{type:String,required:true},
     imageurl:{type:String,required:true},
-    monthlyincome:{type:Number},
+    salarysource:{type:String},
     transactions:[],
     debitCard:{},
     loans:[],

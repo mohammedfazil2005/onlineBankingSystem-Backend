@@ -11,18 +11,16 @@ let transactionObj={}
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 exports.onRegister = async (req, res) => {
-    const { firstname, lastname, DOB, role, phonenumber, state, pincode, email, password, monthlyincome } = req.body
+    const { firstname, lastname, DOB, role, phonenumber, state, pincode, email, password,salarysource } = req.body
     const imageurl = req.file.filename
     try {
         const isUserExists = await users.findOne({ email })
         const bank = await bankdetails.findOne()
 
         if (isUserExists) {
-            res.status(409).json("User already exisits in this email!")
+            res.status(409).json({message:"User already exisits in this email!"})
         } else {
-
-
-            const newUser = new users({ firstname, lastname, DOB, role, phonenumber, state, pincode, email, password, imageurl, monthlyincome })
+            const newUser = new users({ firstname, lastname, DOB, role, phonenumber, state, pincode, email, password, imageurl,salarysource })
             await newUser.save()
 
             if (newUser.role == "accountholder") {
@@ -98,7 +96,7 @@ exports.onRegister = async (req, res) => {
 
             await bank.save()
             await newUser.save()
-            res.json({ token: token, user: newUser })
+            res.status(201).json({ token: token })
 
         }
     } catch (error) {
@@ -447,7 +445,7 @@ exports.onTransactionOTP=async(req,res)=>{
 
                 await users.findOneAndUpdate({_id:isRecipentExists._id},{$inc:{'debitCard.cardBalance':transactionObj.amount},$push:{'debitCard.cardTransactions':creditTransaction}})
 
-                transactionObj.card=="debit"?await users.findOneAndUpdate({_id:isSenderExists._id},{$inc:{"debitCard.cardBalance":-transactionObj.amount},$push:{'debitCard.cardTransactions':debitTransaction}}):await users.findOneAndUpdate({_id:isSenderExists._id,'creditcards.cardTier':transactionObj.card},{$inc:{"creditcards.$.cardBalance":-transactionObj.amount},$push:{'creditcards.$.cardTransactions':debitTransaction}})
+                transactionObj.card=="debit"?await users.findOneAndUpdate({_id:isSenderExists._id},{$inc:{"debitCard.cardBalance":-transactionObj.amount},$push:{'debitCard.cardTransactions':debitTransaction}}):await users.findOneAndUpdate({_id:isSenderExists._id,'creditcards.cardTier':transactionObj.card},{$inc:{"creditcards.$.cardBalance":-transactionObj.amount,'creditcards.$.repayAmount':transactionObj.amount},$push:{'creditcards.$.cardTransactions':debitTransaction}})
 
                 isSenderExists.transactions.push(debitTransaction)
                 isSenderExists.notfications.push(debitNotification)
