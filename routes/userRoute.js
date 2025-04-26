@@ -8,6 +8,7 @@ const tokenAuthentication=require('../middlewares/jwtMiddleware')
 userRouter.post('/register', multerMiddlware.single('imageurl'), userController.onRegister)
 userRouter.post('/loginpassword',userController.onLoginWithEmailAndPassword)
 userRouter.post('/login', userController.onLogin)
+userRouter.post('/loginwith/google',userController.onLoginWithEmail)
 userRouter.post('/verify',userController.onOTP)
 
 userRouter.post('/creditcardApplication',tokenAuthentication,userController.onCreditCardApplication)
@@ -21,6 +22,7 @@ userRouter.get('/get/notifications',tokenAuthentication,userController.onFetchUs
 userRouter.get('/get/profile',tokenAuthentication,userController.onFetchUserProfile)
 
 userRouter.patch('/loanapplication',tokenAuthentication,userController.onLoanApplicatiion)
+userRouter.get('/fetchloans',tokenAuthentication,userController.onFetchLoans)
 
 
 

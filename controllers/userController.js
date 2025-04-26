@@ -37,6 +37,8 @@ exports.onRegister = async (req, res) => {
                     cardExpiryDate: `${month.length >= 2 ? month : `0${month}/${year}`}`,
                     status: "active",
                     penalty:0,
+                    sent:0,
+                    received:0,
                 }
 
                 newUser.debitCard = bankdetails
@@ -92,11 +94,11 @@ exports.onRegister = async (req, res) => {
 
 
 
-            const token = jwt.sign({ userID: newUser._id, role: newUser.role, name: newUser.firstname }, process.env.SECRETKEY)
+            const token = jwt.sign({ userID: newUser._id, role: newUser.role,name: newUser.firstname }, process.env.SECRETKEY)
 
             await bank.save()
             await newUser.save()
-            res.status(201).json({ token: token })
+            res.status(201).json({ token: token,name: newUser.firstname,role: newUser.role })
 
         }
     } catch (error) {
@@ -111,10 +113,29 @@ exports.onLoginWithEmailAndPassword = async (req, res) => {
         const isUserExists = await users.findOne({ email, password })
         if (isUserExists) {
             const token = jwt.sign({ userID: isUserExists._id, role: isUserExists.role, name: isUserExists.firstname }, process.env.SECRETKEY)
-            res.status(200).json({ username: isUserExists.firstname + isUserExists.lastname, token: token })
+            res.status(200).json({ name: isUserExists.firstname, token: token,role:isUserExists.role })
         } else {
             res.status(400).json("User not exist!")
         }
+    } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+    }
+}
+
+exports.onLoginWithEmail=async(req,res)=>{
+    const {email} =req.body
+    try {
+        const isUserExists=await users.findOne({email:email})
+        if(isUserExists){
+            const token = jwt.sign({ userID: isUserExists._id, role: isUserExists.role, name: isUserExists.firstname }, process.env.SECRETKEY)
+            isUserExists.notfications.push({ id: Date.now(), message: "Welcome back! You’re now logged in. Explore your dashboard and manage your account seamlessly. 🚀" })
+            res.status(200).json({ message: "Login success", token: token,role:isUserExists.role,name:isUserExists.firstname })
+        }else{
+            res.status(404).json("User not found!")
+        }
+        
+
     } catch (error) {
         console.log(error)
         res.status(500).json(error)
@@ -136,7 +157,7 @@ exports.onLogin = async (req, res) => {
 
                 setTimeout(() => {
                     delete objOTP[email]
-                    console.log("OTP expired!")
+                
                 }, 3 * 60 * 1000)
 
             } else {
@@ -163,7 +184,7 @@ exports.onOTP = async (req, res) => {
                 const token = jwt.sign({ userID: userExists._id, role: userExists.role, name: userExists.firstname }, process.env.SECRETKEY)
                 userExists.notfications.push({ id: Date.now(), message: "Welcome back! You’re now logged in. Explore your dashboard and manage your account seamlessly. 🚀" })
                 await userExists.save()
-                res.status(200).json({ message: "Login success", token: token })
+                res.status(200).json({ message: "Login success", token: token,role:userExists.role,name:userExists.firstname })
                 delete objOTP[email]
             } else {
                 res.status(400).json("Incorrect OTP")
@@ -281,9 +302,7 @@ exports.onTransaction = async (req, res) => {
         if(isUserExists){
             if(isRecipentExists){
                 
-              let cardDetails=cardType=='gold'?isUserExists.creditcards.find((a)=>a['cardTier']=='gold'):cardType=="silver"?isUserExists.creditcards.find((a)=>a['cardTier']=="silver"):cardType=="debit"?isUserExists.debitCard:""
-
-              if(cardDetails){
+              let cardDetails=isUserExists.debitCard
 
                 if(cardDetails.cardBalance>=amount){
 
@@ -298,7 +317,7 @@ exports.onTransaction = async (req, res) => {
                         from:isUserExists.firstname,
                         to:isRecipentExists.firstname,
                         date:currentDate,
-                        amount:amount,
+                        amount:Number(amount),
                         message:message?message:'',
                         card:cardType,
                         senderID:isUserExists._id,
@@ -314,6 +333,7 @@ exports.onTransaction = async (req, res) => {
                     objOTP={
                         [isUserExists.email]:OTP
                     }
+
                     res.status(200).json("Please Enter your OTP to confirm Transaction!")
 
 
@@ -322,9 +342,7 @@ exports.onTransaction = async (req, res) => {
                 }
                 
 
-              }else{
-                res.status(404).json("Card not found!")
-              }
+             
 
             }else{
                 res.status(400).json("Oops! Account not found!")
@@ -353,37 +371,41 @@ exports.onTransactionOTP=async(req,res)=>{
 
         if(objOTP[transactionObj.email]==OTP){
 
-            const isRecipentExists=await users.findOne({_id:transactionObj.receiverID})
+            try {
+                const isRecipentExists=await users.findOne({_id:transactionObj.receiverID})
             const isSenderExists=await users.findOne({_id:userID})
             const bank=await bankdetails.findOne()
 
-            let cardDetails=transactionObj.card=='gold'?isSenderExists.creditcards.find((a)=>a['cardTier']=='gold'):transactionObj.card==="silver"?isSenderExists.creditcards.find((a)=>a['cardTier']=="silver"):transactionObj.card==="debit"?isSenderExists.debitCard:""
+            let cardDetails=isSenderExists.debitCard
 
             if(cardDetails){
 
-                
-
                 let debitTransaction={
+                    profileimage:transactionObj.profileimage,
                     to:isRecipentExists.firstname,
                     date:transactionObj.date,
                     amount:transactionObj.amount,
-                    card:transactionObj.card,
+                    card:'Debit',
                     message:transactionObj.message,
                     status:'success',
-                    recipentID:isRecipentExists._id
+                    recipentID:isRecipentExists._id,
+                    transactionType:"Debited"
                 }
 
                 let creditTransaction={
+                    profileimage:transactionObj.profileimage,
                     from:isSenderExists.firstname,
                     date:transactionObj.date,
                     amount:transactionObj.amount,
                     message:transactionObj.message,
-                    card:'debit',
+                    card:'Debit',
                     status:'success',
-                    senderID:isRecipentExists._id
+                    senderID:isRecipentExists._id,
+                    transactionType:"Credited"
                 }
 
                 let bankTransaction={
+                    profileimage:transactionObj.profileimage,
                     from:isSenderExists.firstname,
                     to:isRecipentExists.firstname,
                     date:transactionObj.date,
@@ -443,22 +465,11 @@ exports.onTransactionOTP=async(req,res)=>{
                     isRecipentExists.transactionchart.push(newMonth)
                 }
 
-                await users.findOneAndUpdate({_id:isRecipentExists._id},{$inc:{'debitCard.cardBalance':transactionObj.amount},$push:{'debitCard.cardTransactions':creditTransaction}})
+                await users.findOneAndUpdate({_id:isRecipentExists._id},{$inc:{'debitCard.cardBalance':transactionObj.amount,'debitCard.received':transactionObj.amount},$push:{'debitCard.cardTransactions':creditTransaction,notfications:creditNotification,transactions:creditTransaction}})
 
-                transactionObj.card=="debit"?await users.findOneAndUpdate({_id:isSenderExists._id},{$inc:{"debitCard.cardBalance":-transactionObj.amount},$push:{'debitCard.cardTransactions':debitTransaction}}):await users.findOneAndUpdate({_id:isSenderExists._id,'creditcards.cardTier':transactionObj.card},{$inc:{"creditcards.$.cardBalance":-transactionObj.amount,'creditcards.$.repayAmount':transactionObj.amount},$push:{'creditcards.$.cardTransactions':debitTransaction}})
+                await users.findOneAndUpdate({_id:isSenderExists._id},{$inc:{'debitCard.cardBalance':-transactionObj.amount,'debitCard.sent':transactionObj.amount},$push:{'debitCard.cardTransactions':debitTransaction,notfications:debitNotification,transactions:debitTransaction}})
 
-                isSenderExists.transactions.push(debitTransaction)
-                isSenderExists.notfications.push(debitNotification)
-                cardDetails.cardTransactions.push(debitTransaction)
-
-                isRecipentExists.transactions.push(creditTransaction)
-                isRecipentExists.notfications.push(creditNotification)
-                isRecipentExists.debitCard['cardTransactions'].push(creditTransaction)
-                
-
-                bank.alltransactions.push(bankTransaction)
-                bank.allnotifications.push(bankNotification)
-
+                await bankdetails.findOneAndUpdate({},{$push:{alltransactions:bankTransaction,allnotifications:bankNotification}})
 
                 await isSenderExists.save()
                 await isRecipentExists.save()
@@ -471,7 +482,11 @@ exports.onTransactionOTP=async(req,res)=>{
 
                 
             }else{
-                res.status(400).json("Error occured!")
+                res.status(404).json("Error occured!")
+            }
+            } catch (error) {
+                console.log(error)
+                res.status(500).json(error)
             }
 
 
@@ -601,6 +616,9 @@ exports.onLoanApplicatiion=async(req,res)=>{
             if(isUserExists.loans.length>=2){
                 res.status(400).json("You currently have two active loans. Please settle them before proceeding with a new loan request.")
             }else{
+               if(isUserExists.requestedloans.length>=2){
+                res.status(409).json("You have already requested two loans. You cannot request more at this time")
+               }else{
                 const payload={
                     fullname:`${isUserExists.firstname} ${isUserExists.lastname}`,
                     loanType:loanType,
@@ -660,6 +678,7 @@ exports.onLoanApplicatiion=async(req,res)=>{
                 await bank.save()
 
                 res.status(200).json("Loan application submitted successfully. Please wait for approval from the bank. ")
+               }
 
 
 
@@ -675,6 +694,30 @@ exports.onLoanApplicatiion=async(req,res)=>{
         res.status(401).json("Not Authorized!")
     }
 
+
+}
+
+exports.onFetchLoans=async(req,res)=>{
+    const userID=req.userID
+    const userROLE=req.userROLE
+
+    if(userROLE=="accountholder"){
+
+        try {
+            const isUserExists=await users.findById(userID)
+            if(isUserExists){
+                res.status(200).json({loans:isUserExists.loans?isUserExists.loans:[],requestedLoans:isUserExists.requestedloans?isUserExists.requestedloans:[]})
+            }else{
+                res.status(404).json("Account not found!")
+            }
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+
+    }else{
+        res.status(401).json("Not authorized")
+    }
 
 }
 

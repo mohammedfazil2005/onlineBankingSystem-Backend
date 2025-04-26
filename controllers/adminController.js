@@ -357,7 +357,8 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     message:'Withdrawel',
                     card:'debit',
                     status:'success',
-                    senderID:'BANK AI (withdrawel)'
+                    senderID:'BANK AI (withdrawel)',
+                    transactionType:"debited"
                 }
                 
                 
