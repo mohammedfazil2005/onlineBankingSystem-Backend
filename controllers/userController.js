@@ -217,9 +217,10 @@ exports.onCreditCardApplication = async (req, res) => {
                 } else {
 
                     if (isCreditCardAlreadyExists) {
-                        res.status(409).json(`You have already ${cardType} Credit Card!`)
+                        res.status(400).json(`You have already ${cardType} Credit Card!`)
                     } else {
                         const payload = {
+                            profileimg:isUserExists.imageurl,
                             name: `${isUserExists.firstname} ${isUserExists.lastname}`,
                             email: `${isUserExists.email}`,
                             cardType: cardType,
@@ -229,9 +230,14 @@ exports.onCreditCardApplication = async (req, res) => {
                         }
 
                         let notification = {
-                            id: isUserExists._id,
+                            id: Date.now(),
                             message: `${isUserExists.firstname} has applied for a credit card.`
                         }
+
+                        let userNotification = {
+                            id: Date.now(),
+                            message: `You have successfully applied for a credit card.`
+                        };
 
                         const monthIndex = new Date().getMonth()
 
@@ -241,9 +247,10 @@ exports.onCreditCardApplication = async (req, res) => {
 
                         if (isMonthAlreadyExists) {
                             if (cardType == "silver") {
-                                isMonthAlreadyExists.silver += 1
+                                await bankdetails.findOneAndUpdate({'allcreditcardrequestmonthly.month':currentMonth},{$inc:{'allcreditcardrequestmonthly.$.silver':1}})
+                             
                             } else if (cardType == "gold") {
-                                isMonthAlreadyExists.gold += 1
+                                await bankdetails.findOneAndUpdate({'allcreditcardrequestmonthly.month':currentMonth},{$inc:{'allcreditcardrequestmonthly.$.gold':1}})
                             }
                         } else {
                             const newMonth = {
@@ -254,11 +261,14 @@ exports.onCreditCardApplication = async (req, res) => {
                             bankdet.allcreditcardrequestmonthly.push(newMonth)
                         }
 
+                       
 
+                        isUserExists.notfications.push(userNotification)
                         bankdet.creditcardrequests.push(payload);
                         bankdet.allnotifications.push(notification);
 
                         await bankdet.save()
+                        await isUserExists.save()
 
                         res.status(200).json({ message: "Request success!", bank: bankdet })
                     }
@@ -552,7 +562,7 @@ exports.onFetchUserNotifications=async(req,res)=>{
     const userID=req.userID
     const userROLE=req.userROLE
 
-    if(userROLE=="accountholder"){
+    if(userROLE=="accountholder"||userROLE=="accountmanager"||userROLE=="creditcardmanager"||userROLE=="operationmanager"||userROLE=="loanofficer"){
         try {
             const isUserExists=await users.findById(userID)
             if(isUserExists){
@@ -565,7 +575,7 @@ exports.onFetchUserNotifications=async(req,res)=>{
             res.status(500).json(error)
         }
     }else{
-        res.state(401).json("Not authorized")
+        res.status(401).json("Not authorized")
     }
 }
 
@@ -649,10 +659,9 @@ exports.onLoanApplicatiion=async(req,res)=>{
                 const isMonthAlreadyExistsInLoanStatus=bank.allloanstatusmonthly.find((a)=>a['month']==currentMonth)
 
                 if(isMonthAlreadyExistsInLoanStatus){
-                    await bankdetails.findOneAndUpdate({'allloanstatusmonthly.month':currentMonth},{$inc:{'allloanstatusmonthly.$.pending':1}})
+                    await bankdetails.findOneAndUpdate({},{$inc:{'allloanstatusmonthly.pending':1}})
                 }else{
                     let newMonth={
-                        month:currentMonth,
                         pending:1,
                         approved:0,
                         rejected:0,
@@ -721,4 +730,31 @@ exports.onFetchLoans=async(req,res)=>{
 
 }
 
+
+exports.onUpdateUserProfile=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+
+    if(userROLE=="accountholder"){
+        const {firstname,lastname,email,DOB,phonenumber,state,pincode,imageurl}=req.body
+
+        const image=req.file?req.file.filename:imageurl;
+
+        try {
+            await users.findOneAndUpdate({_id:userID},{firstname,lastname,email,DOB,phonenumber,state,pincode,imageurl:image},{new:true})
+            res.status(200).json("Updated succesfully")
+            
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+        
+        
+
+    }else{
+        res.status(401).json("Not authorized")
+    }
+
+
+}
 

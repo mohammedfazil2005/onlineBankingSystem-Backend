@@ -9,7 +9,7 @@ const transporter=nodemailer.createTransport({
 })
 
 const sendOTP=async(email,OTPnumber)=>{
-
+    
     const mailOptions={
         from:process.env.GOOGLEEMAIL,
         to:email,

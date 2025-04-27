@@ -9,8 +9,11 @@ const userRouter=require('./routes/userRoute')
 const adminRouter=require('./routes/adminRoute')
 const server=express()
 
+
 server.use(cors())
+server.use("/uploads",express.static('./uploads'))
 server.use(express.json())
+
 
 server.use(userRouter)
 server.use(adminRouter)

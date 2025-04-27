@@ -24,6 +24,10 @@ userRouter.get('/get/profile',tokenAuthentication,userController.onFetchUserProf
 userRouter.patch('/loanapplication',tokenAuthentication,userController.onLoanApplicatiion)
 userRouter.get('/fetchloans',tokenAuthentication,userController.onFetchLoans)
 
+userRouter.patch('/update/profile',tokenAuthentication,multerMiddlware.single('imageurl'),userController.onUpdateUserProfile)
+
+
+
 
 
 

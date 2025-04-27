@@ -16,4 +16,10 @@ adminRouter.get('/getcreditcards/approved',tokenAuthentication,adminController.g
 adminRouter.post('/withdraw/:accno',tokenAuthentication,adminController.onWithdrawel)
 adminRouter.post('/withdrawOTP/:OTP',tokenAuthentication,adminController.onWithdrawelOTP)
 
+adminRouter.get('/getaccountholders',tokenAuthentication,adminController.getAllAccountHolders)
+adminRouter.get('/getalltransaction',tokenAuthentication,adminController.getAllTransactions)
+adminRouter.get('/getallnotifications',tokenAuthentication,adminController.getAllNotifications)
+
+adminRouter.get('/getdashboard/details',tokenAuthentication,adminController.getDashboardDetailsAdmin)
+
 module.exports=adminRouter

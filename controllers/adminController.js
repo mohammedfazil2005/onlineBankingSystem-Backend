@@ -1,7 +1,8 @@
 const sendOTP = require('../middlewares/emailMiddlware')
 const bankdetails = require('../models/bankModel')
 const bankModel=require('../models/bankModel')
-const users=require('../models/userModel')
+const users = require('../models/userModel')
+
 const randomString=require('randomstring')
 
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -96,6 +97,12 @@ exports.addStaff=async(req,res)=>{
                     id:Date.now(),
                    message: `A new staff member has been added: ${firstname}, Role: ${role}.`    
                 }
+                let staffMessage={
+                    id:Date.now(),
+                   message: `Welcome aboard, ${firstname}! You have been added as a ${role}.`    
+                }
+                await newStaff.save()
+                newStaff.notfications.push(staffMessage)
                 await newStaff.save()
                 await bankModel.findOneAndUpdate({},{$push:{allnotifications:bankmessage}},{new:true})
                 
@@ -170,19 +177,18 @@ exports.approveLoan=async(req,res)=>{
                 id: Date.now(),
                 message: `🎉 Loan Approved! A loan request for ₹${isLoanExists.requestedAmount} has been approved by ${adminName} (${userROLE}). The loan will be processed for the account holder ${isLoanExists.fullname}. ✔️`
             }
-            let cmonth=new Date().getMonth()
-            let currentMonth=monthNames[cmonth]
+            
+          
 
-            let isMonthAlreadyExists=bank.allloanstatusmonthly.find((a)=>a['month']==currentMonth)
+            let isMonthAlreadyExists=bank.allloanstatusmonthly
 
             if(isMonthAlreadyExists){
                 if(isMonthAlreadyExists.pending>0){
-                    await bankdetails.findOneAndUpdate({'allloanstatusmonthly.month':currentMonth},{$inc:{'allloanstatusmonthly.$.pending':-1}})
+                    await bankdetails.findOneAndUpdate({},{$inc:{'allloanstatusmonthly.pending':-1}})
                 }
-                await bankdetails.findOneAndUpdate({'allloanstatusmonthly.month':currentMonth},{$inc:{'allloanstatusmonthly.$.approved':1}})
+                await bankdetails.findOneAndUpdate({},{$inc:{'allloanstatusmonthly.approved':1}})
             }else{
-                let newMonth={
-                    month:currentMonth,
+                let newMonth={   
                     pending:0,
                     approved:1,
                     rejected:0,
@@ -192,7 +198,7 @@ exports.approveLoan=async(req,res)=>{
 
 
                await bankdetails.findOneAndUpdate({},{$inc:{bankbalance:-isLoanExists.requestedAmount,loanapprovedamount:isLoanExists.requestedAmount},$push:{approvedloans:loanpayload,allnotifications:loanApprovedMessageForUser}})
-                await users.findOneAndUpdate({_id:isLoanExists.userID},{$inc:{'debitCard.cardBalance':isLoanExists.requestedAmount},$push:{notfications:loanApprovedMessageForUser,loans:loanpayload},$pull:{requestedloans:{id:loanID}}})
+                await users.findOneAndUpdate({_id:isLoanExists.userID},{$inc:{'debitCard.cardBalance':isLoanExists.requestedAmount},$push:{notfications:loanApprovedMessageForGM,loans:loanpayload},$pull:{requestedloans:{id:loanID}}})
                 bank.save()
                 res.status(200).json("Loan Approved!")
 
@@ -245,7 +251,6 @@ exports.onWithdrawel=async(req,res)=>{
     const userROLE=req.userROLE
     const accountNumber=req.params.accno
     const {amount}=req.body
-    console.log(amount)
     if(userROLE=="accountmanager"||userROLE=="generalmanager"){
         try {
             const isAccountExists=await users.findOne({'debitCard.accountNumber':accountNumber})
@@ -271,7 +276,7 @@ exports.onWithdrawel=async(req,res)=>{
                 }
                
             }else{
-                res.status(400).json("Account not found!")
+                res.status(404).json("Account not found!")
             }
         } catch (error) {
             console.log(error)
@@ -283,6 +288,7 @@ exports.onWithdrawel=async(req,res)=>{
 }
 
 exports.onWithdrawelOTP=async(req,res)=>{
+    const adminID=req.userID
     const userROLE=req.userROLE
     let OTP=req.params.OTP
     if(userROLE=="accountmanager"||userROLE=="generalmanager"){
@@ -343,6 +349,11 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     id: Date.now(),
                     message: `💳 Cash Withdrawal Alert! User ${withdrawAccountID.name}  withdrew ₹${withdrawAccountID.amount} using their debit card starting in ${withdrawAccountID.firstdigits}.`
                   };
+
+                  const cashWithdrawalMessageForStaff = {
+                    id: Date.now(),
+                    message: `💳 Cash Withdrawal Notification: You have successfully withdrawn ₹${withdrawAccountID.amount} using your debit card starting in ${withdrawAccountID.firstdigits}.`
+                  };
                 
                   let cDate=new Date().getDate()
                   let cMonths=new Date().getMonth()
@@ -352,19 +363,24 @@ exports.onWithdrawelOTP=async(req,res)=>{
                 
                     let debitTransaction={
                     from:withdrawAccountID.name,
+                    to:'withdraw',
                     date:currentDate,
                     amount:withdrawAccountID.amount,
                     message:'Withdrawel',
                     card:'debit',
                     status:'success',
                     senderID:'BANK AI (withdrawel)',
-                    transactionType:"debited"
+                    transactionType:"debited",
+                    withdrawnBy:adminID
+                    
                 }
                 
                 
                  await users.findOneAndUpdate({'debitCard.accountNumber':withdrawAccountID.accno},{$inc:{'debitCard.cardBalance':-withdrawAccountID.amount},$push:{notfications:cashWithdrawalUserNotification,transactions:debitTransaction,'debitCard.cardTransactions':debitTransaction}})
                  
                  await bankdetails.findOneAndUpdate({},{$inc:{totalwithdrawelamount:withdrawAccountID.amount},$push:{allnotifications:cashWithdrawalMessageForGM,alltransactions:debitTransaction}})
+
+                 await users.findOneAndUpdate({_id:adminID},{$push:{notfications:cashWithdrawalMessageForStaff}})
                  
                 await bank.save()
                 await isUser.save()
@@ -390,11 +406,85 @@ exports.onWithdrawelOTP=async(req,res)=>{
     }
 }
 
+exports.getAllAccountHolders=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+    if(userROLE=="accountmanager"||userROLE=="generalmanager"){
+        try {
+            const Allusers=await users.find({'role':'accountholder'})
+            res.status(200).json(Allusers)
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+    }else{
+        res.status(401).json("Not Authorized!")
+    }
+}
+
+
+exports.getAllTransactions=async(req,res)=>{
+    const userROLE=req.userROLE
+    if(userROLE=="generalmanager"){
+        try {
+            const allTransactions=await bankdetails.findOne({})
+            res.status(200).json(allTransactions.alltransactions)
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+
+    }else{
+        res.status(401).json("Not authorized")
+    }
 
 
 
+}
 
+exports.getAllNotifications=async(req,res)=>{
+    const userROLE=req.userROLE
+    if(userROLE=="generalmanager"){
+        try {
+            const allTransactions=await bankdetails.findOne({})
+            res.status(200).json(allTransactions.allnotifications)
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
 
+    }else{
+        res.status(401).json("Not authorized!")
+    }
+}
 
+exports.getDashboardDetailsAdmin=async(req,res)=>{
+    const userRole=req.userROLE
+    if(userRole=="generalmanager"||userRole=="accountmanager"||userRole=="creditcardmanager"||userRole=="operationmanager"||userRole=="loanofficer"){
+        try {
 
+            const bank=await bankdetails.findOne({})
+            const allusers=await users.find() 
+            const details={
+                totalbalance:bank.bankbalance,
+                totalusers:allusers.length,
+                totalloanamountapproved:bank.loanapprovedamount,
+                totalwithdrawelamount:bank.totalwithdrawelamount,
+                totalcreditcardApproved:bank.approvedcreditcards.length,
+                totalcreditcardrequestpending:bank.creditcardrequests.length,
+                totalaccountholders:allusers.filter((a)=>a['role']=="accountholder").length,
+                totalloansapproved:bank.approvedloans.length,
+                totalloansrequestpending:bank.loanrequest.length,
 
+            }
+            res.status(200).json(details)
+            
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+
+    }else{
+        res.status(401).json("Not authorized!")
+    }
+}
