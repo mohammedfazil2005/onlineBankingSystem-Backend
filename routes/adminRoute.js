@@ -21,5 +21,11 @@ adminRouter.get('/getalltransaction',tokenAuthentication,adminController.getAllT
 adminRouter.get('/getallnotifications',tokenAuthentication,adminController.getAllNotifications)
 
 adminRouter.get('/getdashboard/details',tokenAuthentication,adminController.getDashboardDetailsAdmin)
+adminRouter.post('/sendnotifications',tokenAuthentication,adminController.sendNotificationToAllUsers)
+
+adminRouter.patch('/sendnotification/user/:userid',tokenAuthentication,adminController.sendNotificationToUser)
+adminRouter.get('/fetchuserdetails/:id',tokenAuthentication,adminController.fetchUserDetails)
+adminRouter.patch('/rejectcreditcard/requests/:id',tokenAuthentication,adminController.onRejectCreditCardRequest)
+adminRouter.delete('/rejectloan/requests',tokenAuthentication,adminController.onRejectLoanRequests)
 
 module.exports=adminRouter

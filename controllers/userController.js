@@ -659,7 +659,7 @@ exports.onLoanApplicatiion=async(req,res)=>{
                 const isMonthAlreadyExistsInLoanStatus=bank.allloanstatusmonthly.find((a)=>a['month']==currentMonth)
 
                 if(isMonthAlreadyExistsInLoanStatus){
-                    await bankdetails.findOneAndUpdate({},{$inc:{'allloanstatusmonthly.pending':1}})
+                    await bankdetails.findOneAndUpdate({'allloanstatusmonthly.month':currentMonth},{$inc:{'allloanstatusmonthly.$.pending':1}})
                 }else{
                     let newMonth={
                         pending:1,
@@ -758,3 +758,47 @@ exports.onUpdateUserProfile=async(req,res)=>{
 
 }
 
+exports.onCancelLoanRequests=async(req,res)=>{
+    const userID=req.userID
+    const userROLE=req.userROLE
+    const loanId=Number(req.params.id)
+  
+    if(userROLE=="accountholder"){
+           const userNotification = {
+            id: Date.now(),
+            message: "The loan request has been cancelled successfully. You can apply again anytime."
+          };
+
+          const adminNotification = {
+            id: Date.now(),
+            message: "A user has successfully cancelled their loan request."
+          };
+
+
+        await users.findOneAndUpdate({_id:userID},{$pull:{requestedloans:{id:loanId}},$push:{notfications:userNotification}})
+        await users.updateMany({role:"loanofficer"},{$push:{notfications:adminNotification}})
+        await bankdetails.updateOne({},{$pull:{loanrequest:{id:loanId}},$push:{allnotifications:adminNotification}})
+        res.status(200).json("Loan request cancelled!")
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.onFetchLoanAmount=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+    const loanID=req.params.id
+
+    if(userROLE=="accountholder"){
+        const isUser=await users.findOne({_id:userID})
+        // console.log(isUser)
+        const findLoan=isUser.loans.find((a)=>a['loanID']==Number(loanID))
+        if(findLoan){
+            res.status(200).json(findLoan)
+        }else{
+            res.status(404).json("Loan not found")
+        }
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}

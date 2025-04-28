@@ -26,8 +26,9 @@ userRouter.get('/fetchloans',tokenAuthentication,userController.onFetchLoans)
 
 userRouter.patch('/update/profile',tokenAuthentication,multerMiddlware.single('imageurl'),userController.onUpdateUserProfile)
 
+userRouter.delete('/cancel/loanrequest/:id',tokenAuthentication,userController.onCancelLoanRequests)
 
-
+userRouter.get('/get/loanamount/:id',tokenAuthentication,userController.onFetchLoanAmount)
 
 
 
