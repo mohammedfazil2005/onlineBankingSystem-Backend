@@ -8,6 +8,8 @@ let objOTP = {}
 
 let transactionObj={}
 
+let loanObj={}
+
 const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 exports.onRegister = async (req, res) => {
@@ -316,35 +318,39 @@ exports.onTransaction = async (req, res) => {
 
                 if(cardDetails.cardBalance>=amount){
 
-                    let date=new Date().getDate()
-                    let month=new Date().getMonth()
-                    let year=new Date().getFullYear()
-
-                    let currentDate=`${date}/${month}/${year}`
-
-                    transactionObj={
-                        profileimage:isUserExists.imageurl,
-                        from:isUserExists.firstname,
-                        to:isRecipentExists.firstname,
-                        date:currentDate,
-                        amount:Number(amount),
-                        message:message?message:'',
-                        card:cardType,
-                        senderID:isUserExists._id,
-                        receiverID:isRecipentExists._id,
-                        email:isUserExists.email
-                        
+                    if(cardDetails.status=="active"){
+                        let date=new Date().getDate()
+                        let month=new Date().getMonth()
+                        let year=new Date().getFullYear()
+    
+                        let currentDate=`${date}/${month}/${year}`
+    
+                        transactionObj={
+                            profileimage:isUserExists.imageurl,
+                            from:isUserExists.firstname,
+                            to:isRecipentExists.firstname,
+                            date:currentDate,
+                            amount:Number(amount),
+                            message:message?message:'',
+                            card:cardType,
+                            senderID:isUserExists._id,
+                            receiverID:isRecipentExists._id,
+                            email:isUserExists.email
+                            
+                        }
+    
+                        let OTP=randomString.generate({charset:'numeric',length:4})
+                        console.log(OTP)
+                        await sendOTP(isUserExists.email,OTP)
+    
+                        objOTP={
+                            [isUserExists.email]:OTP
+                        }
+    
+                        res.status(200).json("Please Enter your OTP to confirm Transaction!")
+                    }else{
+                        res.status(403).json("Card is freezed")
                     }
-
-                    let OTP=randomString.generate({charset:'numeric',length:4})
-
-                    await sendOTP(isUserExists.email,OTP)
-
-                    objOTP={
-                        [isUserExists.email]:OTP
-                    }
-
-                    res.status(200).json("Please Enter your OTP to confirm Transaction!")
 
 
                 }else{
@@ -355,7 +361,7 @@ exports.onTransaction = async (req, res) => {
              
 
             }else{
-                res.status(400).json("Oops! Account not found!")
+                res.status(404).json("Oops! Account not found!")
             }
         }else{
             res.status(400).json("Please login again!")
@@ -399,7 +405,8 @@ exports.onTransactionOTP=async(req,res)=>{
                     message:transactionObj.message,
                     status:'success',
                     recipentID:isRecipentExists._id,
-                    transactionType:"Debited"
+                    transactionType:"Debited",
+                    transactionID:Date.now()
                 }
 
                 let creditTransaction={
@@ -411,7 +418,8 @@ exports.onTransactionOTP=async(req,res)=>{
                     card:'Debit',
                     status:'success',
                     senderID:isRecipentExists._id,
-                    transactionType:"Credited"
+                    transactionType:"Credited",
+                    transactionID:Date.now()
                 }
 
                 let bankTransaction={
@@ -423,7 +431,8 @@ exports.onTransactionOTP=async(req,res)=>{
                     card:transactionObj.card,
                     status:'success',
                     senderID:isRecipentExists._id,
-                    recipentID:isRecipentExists._id
+                    recipentID:isRecipentExists._id,
+                    transactionID:Date.now()
                 }
                 
 
@@ -521,7 +530,7 @@ exports.onFetchUserTransactions=async(req,res)=>{
         try {
             const isUserExists=await users.findById(userID)
             if(isUserExists){
-                res.status(200).json(isUserExists.transactions)
+                res.status(200).json(isUserExists.transactions.reverse())
             }else{
                 res.status(400).json("user not found!")
             }
@@ -566,7 +575,7 @@ exports.onFetchUserNotifications=async(req,res)=>{
         try {
             const isUserExists=await users.findById(userID)
             if(isUserExists){
-                res.status(200).json(isUserExists.notfications)
+                res.status(200).json(isUserExists.notfications.reverse())
             }else{
                 res.status(400).json("user not found!")
             }
@@ -798,6 +807,154 @@ exports.onFetchLoanAmount=async(req,res)=>{
         }else{
             res.status(404).json("Loan not found")
         }
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.onFetchUserDashboardDetails=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+    if(userROLE=="accountholder"){
+        const isUser=await users.findOne({_id:userID})
+        const recentTransaction=isUser.transactions.slice(-5).reverse()
+        const payload={
+            name:`${isUser.firstname} ${isUser.lastname}`,
+            debitcardBalance:isUser.debitCard.cardBalance,
+            transactions:recentTransaction
+        }
+        res.status(200).json(payload)
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.onPayFullLoanAmount=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+    const {accountNumber,cvv,loanID}=req.body
+  
+    if(userROLE=="accountholder"){
+     try {
+        const isUser=await users.findOne({'debitCard.accountNumber':accountNumber,'debitCard.cvv':cvv})
+        const isLoanExists=await users.findOne({'loans.loanID':loanID})
+        const loan=isLoanExists.loans.find((a)=>a['loanID']==loanID)
+        if(isUser){
+            if(isUser.debitCard.cardBalance>=Number(loan.loanamount)){
+                const OTP=randomString.generate({charset:"numeric",length:4})
+               loanObj={
+                amount:Number(loan.loanamount),
+                loanid:loanID,
+                accountNumber:accountNumber,
+                userID:userID,
+                cvv:cvv,
+                otp:OTP
+               }
+    
+               sendOTP(isUser.email,OTP)
+               res.status(200).json("OTP sent successfully!")
+    
+    
+            }else{
+                res.status(400).json("Insufficent Balance")
+            }
+        }else{
+            res.status(404).json("Account not found")
+        }
+       
+     } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+     }
+       
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+
+exports.onPayFullLoanAmountOTP=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.userID
+    const OTP=req.params.id
+  
+    if(userROLE=="accountholder"){
+      if(loanObj['otp']==OTP){
+       try {
+        let userMessage = {
+            id: Date.now(),
+            message: "✅ Your loan has been successfully closed. Thank you for your timely repayment!"
+          };
+          let adminMessage = {
+            id: Date.now(),
+            message: "🗂️ A user's loan has been successfully closed and marked as complete in the system."
+          };
+
+          let debitNotification={
+            id:Date.now(),
+            message: `₹${loanObj.amount} has been successfully debited from your account. Check your transaction history for more details. `
+         }
+
+         let creditNotification={
+            id:Date.now(),
+            message: `💰 A user has fully repaid their loan. The recovered amount has been successfully added back to the bank's account. `
+         }
+
+          let cDate=new Date().getDate()
+          let cMonths=new Date().getMonth()
+          let cYears=new Date().getFullYear()
+        
+          let currentDate=`${cDate}/${cMonths}/${cYears}`
+
+          let debitTransaction={
+            to:'BankAI',
+            date:currentDate,
+            amount:loanObj.amount,
+            card:'Debit',
+            message:'CLOSED LOAN',
+            status:'success',
+            recipentID:'BANK AI',
+            transactionType:"Debited",
+            transactionID:Date.now()
+        }
+
+        const isSenderExists=await users.findOne({'debitCard.accountNumber':loanObj.accountNumber})
+
+        let thisMonth=new Date().getMonth()
+
+        let currentMonth=monthNames[thisMonth]
+
+        let isMonthAlreadyExistsInUserTransaction=isSenderExists.transactionchart.find((a)=>a['month']==currentMonth)
+
+                if(isMonthAlreadyExistsInUserTransaction){
+                    await users.findOneAndUpdate({'debitCard.accountNumber':loanObj.accountNumber,'transactionchart.month':currentMonth},{$inc:{'transactionchart.$.count':1}})
+                }else{
+                    let newMonth={
+                        month:currentMonth,
+                        count:1
+                    }
+                    isSenderExists.transactionchart.push(newMonth)
+                }
+
+        
+
+        await bankdetails.findOneAndUpdate({},{$inc:{bankbalance:loanObj.amount},$pull:{approvedloans:{loanID:loanObj.loanid}},$push:{allnotifications:{$each:[adminMessage,creditNotification]},alltransactions:debitTransaction,}})
+
+        await users.updateMany({role:'accountmanager'},{$push:{notfications:adminMessage}})
+        await users.findOneAndUpdate({_id:userID},{$pull:{loans:{loanID:loanObj.loanid}},$push:{notfications:userMessage}})
+
+        await users.findOneAndUpdate({'debitCard.accountNumber':loanObj.accountNumber},{$push:{transactions:debitTransaction,notfications:debitNotification},$inc:{'debitCard.cardBalance':-loanObj.amount}})
+        isSenderExists.save()
+        res.status(200).json("Loan closed!!")
+       } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+       }
+
+      }else{
+        res.status(402).json("Incorrect OTP")
+      }
+       
     }else{
         res.status(401).json("Not authorized")
     }

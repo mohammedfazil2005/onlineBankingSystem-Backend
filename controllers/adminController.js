@@ -381,7 +381,8 @@ exports.onWithdrawelOTP=async(req,res)=>{
                     status:'success',
                     senderID:'BANK AI (withdrawel)',
                     transactionType:"debited",
-                    withdrawnBy:adminID
+                    withdrawnBy:adminID,
+                    transactionID:Date.now()
                     
                 }
                 
@@ -438,7 +439,7 @@ exports.getAllTransactions=async(req,res)=>{
     if(userROLE=="generalmanager"){
         try {
             const allTransactions=await bankdetails.findOne({})
-            res.status(200).json(allTransactions.alltransactions)
+            res.status(200).json(allTransactions.alltransactions.reverse())
         } catch (error) {
             console.log(error)
             res.status(500).json(error)
@@ -457,7 +458,7 @@ exports.getAllNotifications=async(req,res)=>{
     if(userROLE=="generalmanager"){
         try {
             const allTransactions=await bankdetails.findOne({})
-            res.status(200).json(allTransactions.allnotifications)
+            res.status(200).json(allTransactions.allnotifications.reverse())
         } catch (error) {
             console.log(error)
             res.status(500).json(error)
@@ -475,6 +476,7 @@ exports.getDashboardDetailsAdmin=async(req,res)=>{
 
             const bank=await bankdetails.findOne({})
             const allusers=await users.find() 
+            const lastTransactions=bank.alltransactions.slice(-5).reverse()
             const details={
                 totalbalance:bank.bankbalance,
                 totalusers:allusers.length,
@@ -488,7 +490,9 @@ exports.getDashboardDetailsAdmin=async(req,res)=>{
                 loanstatusmonthlychart:bank.allloanstatusmonthly,
                 loanmonthlyrequestchart:bank.allloanrequestmonthly,
                 creditcardMonthlyrequestschart:bank.allcreditcardrequestmonthly,
-                withdrawelmonthlychart:bank.allwithdrawelmonthly
+                withdrawelmonthlychart:bank.allwithdrawelmonthly,
+                lastTransactions:lastTransactions,
+                loanRequestMonthly:bank.allloanrequestmonthly
 
             }
             res.status(200).json(details)
@@ -667,4 +671,124 @@ exports.onRejectLoanRequests=async(req,res)=>{
         res.status(500).json("Not authorized")
     }
 
+}
+
+exports.onDeleteAccount=async(req,res)=>{
+    const userRole=req.userROLE
+    const userID=req.params.id
+    if(userRole=="accountmanager"||userRole=="generalmanager"){
+        let bankmessage = {
+            id: Date.now(),
+            message: "🗑️ An account was deleted by an administrator. All associated data has been removed, and the user's total balance has been credited back to the bank."
+          };
+        try {
+            const findUser=await users.findOne({_id:userID})
+
+            let amount=findUser.debitCard.cardBalance||0
+
+            if(findUser.creditcards.length>0){
+                amount+=findUser.creditcards.reduce((a,b)=>a+b['cardBalance'],0)
+            }
+
+            
+            let cDate=new Date().getDate()
+            let cMonths=new Date().getMonth()
+            let cYears=new Date().getFullYear()
+          
+            let currentDate=`${cDate}/${cMonths}/${cYears}`
+
+            let debitTransaction={
+                from:findUser.name,
+                date:currentDate,
+                amount:amount,
+                message:'Deleted an account!',
+                card:'debit',
+                status:'success',
+                senderID:'BANK AI (withdrawel)',
+                transactionType:"debited",
+                transactionID:Date.now()
+                
+            }
+            
+            
+            await users.deleteOne({_id:userID})
+            await users.updateMany({role:"accountmanager"},{$push:{notfications:bankmessage}})
+            await bankdetails.findOneAndUpdate({},{$push:{allnotifications:bankmessage,alltransactions:debitTransaction},$pull:{approvedloans:{userID:userID},approvedcreditcards:{accountholderID:userID}},$inc:{bankbalance:amount}})
+            res.status(200).json("Account Deleted!")
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.onFreezeCard=async(req,res)=>{
+    const userROLE=req.userROLE
+    const {userID,accountNumber}=req.body
+    if(userROLE=="generalmanager"){
+        let userMessage = {
+            id: Date.now(),
+            message: "🧊 Your account has been frozen by an administrator. Please contact support to resolve the issue."
+          };
+          let adminMessage = {
+            id: Date.now(),
+            message: "🧊 An account has been frozen by the administrator due to policy enforcement or suspicious activity."
+          };
+        try {
+         await users.findOneAndUpdate({_id:userID,'debitCard.accountNumber':accountNumber},{$set:{'debitCard.status':'freezed'},$push:{notfications:userMessage}})
+         await bankdetails.findOneAndUpdate({},{$push:{allnotifications:adminMessage}})
+    
+         res.status(200).json("Card freezed!")     
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }   
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.onActivateCard=async(req,res)=>{
+    const userROLE=req.userROLE
+    const {userID,accountNumber}=req.body
+    if(userROLE=="generalmanager"){
+        let userMessage = {
+            id: Date.now(),
+            message: "✅ Your account has been reactivated. You can now access all services and features as usual."
+          };
+          
+          let adminMessage = {
+            id: Date.now(),
+            message: "✅ A previously frozen account has been successfully reactivated by the administrator."
+          };
+        try {
+         await users.findOneAndUpdate({_id:userID,'debitCard.accountNumber':accountNumber},{$set:{'debitCard.status':'active'},$push:{notfications:userMessage}})
+         await bankdetails.findOneAndUpdate({},{$push:{allnotifications:adminMessage}})
+    
+         res.status(200).json("Card freezed!")     
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }   
+    }else{
+        res.status(401).json("Not authorized")
+    }
+}
+
+exports.fetchApprovedLoans=async(req,res)=>{
+    const userROLE=req.userROLE
+    if(userROLE=="generalmanager"||userROLE=="loanofficer"){
+        try {
+            const allTransactions=await bankdetails.findOne({})
+            res.status(200).json(allTransactions.approvedloans.reverse())
+        } catch (error) {
+            console.log(error)
+            res.status(500).json(error)
+        }
+
+    }else{
+        res.status(401).json("Not authorized")
+    }
 }

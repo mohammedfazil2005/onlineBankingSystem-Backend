@@ -30,6 +30,12 @@ userRouter.delete('/cancel/loanrequest/:id',tokenAuthentication,userController.o
 
 userRouter.get('/get/loanamount/:id',tokenAuthentication,userController.onFetchLoanAmount)
 
+userRouter.get('/dashboard/user',tokenAuthentication,userController.onFetchUserDashboardDetails)
+
+userRouter.patch('/payfullamount/loan',tokenAuthentication,userController.onPayFullLoanAmount)
+
+userRouter.patch('/payfullamount/otp/:id',tokenAuthentication,userController.onPayFullLoanAmountOTP)
+
 
 
 module.exports = userRouter

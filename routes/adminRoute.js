@@ -27,5 +27,9 @@ adminRouter.patch('/sendnotification/user/:userid',tokenAuthentication,adminCont
 adminRouter.get('/fetchuserdetails/:id',tokenAuthentication,adminController.fetchUserDetails)
 adminRouter.patch('/rejectcreditcard/requests/:id',tokenAuthentication,adminController.onRejectCreditCardRequest)
 adminRouter.delete('/rejectloan/requests',tokenAuthentication,adminController.onRejectLoanRequests)
+adminRouter.delete('/deleteaccount/:id',tokenAuthentication,adminController.onDeleteAccount)
+adminRouter.patch('/onfreezecard',tokenAuthentication,adminController.onFreezeCard)
+adminRouter.patch('/onactivatecard',tokenAuthentication,adminController.onActivateCard)
+adminRouter.get('/onfetchapproved/loans',tokenAuthentication,adminController.fetchApprovedLoans)
 
 module.exports=adminRouter
