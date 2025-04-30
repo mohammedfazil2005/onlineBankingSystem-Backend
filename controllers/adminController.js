@@ -792,3 +792,24 @@ exports.fetchApprovedLoans=async(req,res)=>{
         res.status(401).json("Not authorized")
     }
 }
+
+exports.onRemoveStaffs=async(req,res)=>{
+    const userROLE=req.userROLE
+    const userID=req.params.id
+
+    if(userROLE=="generalmanager"){
+         const findUser=await users.findOne({_id:userID})
+         const BankMessage = {
+            id: Date.now(),
+            message: `👤 ${findUser.role} ${findUser.firstname} has been removed from the system. Their access and privileges have been revoked.`
+          }
+        await users.findOneAndDelete({_id:userID})
+        await bankdetails.findOneAndUpdate({},{$push:{allnotifications:BankMessage}})
+        res.status(200).json('Staff Deleted')
+    }else{
+        res.status(401).json('Not authorized!')
+    }
+
+
+
+}

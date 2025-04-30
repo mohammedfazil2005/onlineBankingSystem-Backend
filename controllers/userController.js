@@ -821,7 +821,8 @@ exports.onFetchUserDashboardDetails=async(req,res)=>{
         const payload={
             name:`${isUser.firstname} ${isUser.lastname}`,
             debitcardBalance:isUser.debitCard.cardBalance,
-            transactions:recentTransaction
+            transactions:recentTransaction,
+            transactionchart:isUser.transactionchart
         }
         res.status(200).json(payload)
     }else{
@@ -958,4 +959,18 @@ exports.onPayFullLoanAmountOTP=async(req,res)=>{
     }else{
         res.status(401).json("Not authorized")
     }
+}
+
+exports.onDeletNotification=async(req,res)=>{
+    const userID=req.userID
+    const id =req.params.id
+    try {
+       
+        await users.findOneAndUpdate({_id:userID},{$pull:{notfications:{id:Number(id)}}})
+        res.status(200).json("Notification Deleted")
+    } catch (error) {
+        console.log(error)
+    }
+
+
 }

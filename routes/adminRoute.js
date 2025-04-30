@@ -31,5 +31,6 @@ adminRouter.delete('/deleteaccount/:id',tokenAuthentication,adminController.onDe
 adminRouter.patch('/onfreezecard',tokenAuthentication,adminController.onFreezeCard)
 adminRouter.patch('/onactivatecard',tokenAuthentication,adminController.onActivateCard)
 adminRouter.get('/onfetchapproved/loans',tokenAuthentication,adminController.fetchApprovedLoans)
+adminRouter.delete('/onRemove/staffs/:id',tokenAuthentication,adminController.onRemoveStaffs)
 
 module.exports=adminRouter
