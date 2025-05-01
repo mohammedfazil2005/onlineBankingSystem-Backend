@@ -340,7 +340,7 @@ exports.onTransaction = async (req, res) => {
                         }
     
                         let OTP=randomString.generate({charset:'numeric',length:4})
-                        console.log(OTP)
+                     
                         await sendOTP(isUserExists.email,OTP)
     
                         objOTP={
@@ -663,20 +663,13 @@ exports.onLoanApplicatiion=async(req,res)=>{
                         count:1
                     }
                     bank.allloanrequestmonthly.push(newMonth)
+                
                 }
 
-                const isMonthAlreadyExistsInLoanStatus=bank.allloanstatusmonthly.find((a)=>a['month']==currentMonth)
 
-                if(isMonthAlreadyExistsInLoanStatus){
-                    await bankdetails.findOneAndUpdate({'allloanstatusmonthly.month':currentMonth},{$inc:{'allloanstatusmonthly.$.pending':1}})
-                }else{
-                    let newMonth={
-                        pending:1,
-                        approved:0,
-                        rejected:0,
-                    }
-                    bank.allloanstatusmonthly.push(newMonth)
-                }
+             
+
+                
                 
                 let userMessage = {
                     id: Date.now(),
@@ -688,6 +681,8 @@ exports.onLoanApplicatiion=async(req,res)=>{
                     message: `Loan application received from ${isUserExists.firstname}: ₹${loanAmount} for a ${loanDuration}-year ${loanType} loan. Pending approval.`
                 };
                 
+                await bankdetails.findOneAndUpdate({},{$inc:{'allloanstatusmonthly.0.pending':1}})
+
 
                 await users.findOneAndUpdate({_id:userID},{$push:{requestedloans:payload,notfications:userMessage}})
                 bank.loanrequest.push(payload)
@@ -822,7 +817,8 @@ exports.onFetchUserDashboardDetails=async(req,res)=>{
             name:`${isUser.firstname} ${isUser.lastname}`,
             debitcardBalance:isUser.debitCard.cardBalance,
             transactions:recentTransaction,
-            transactionchart:isUser.transactionchart
+            transactionchart:isUser.transactionchart,
+            creditcards:isUser.creditcards
         }
         res.status(200).json(payload)
     }else{
@@ -834,6 +830,10 @@ exports.onPayFullLoanAmount=async(req,res)=>{
     const userROLE=req.userROLE
     const userID=req.userID
     const {accountNumber,cvv,loanID}=req.body
+
+    console.log(accountNumber)
+    console.log(cvv)
+    console.log(loanID)
   
     if(userROLE=="accountholder"){
      try {
@@ -851,7 +851,6 @@ exports.onPayFullLoanAmount=async(req,res)=>{
                 cvv:cvv,
                 otp:OTP
                }
-    
                sendOTP(isUser.email,OTP)
                res.status(200).json("OTP sent successfully!")
     
@@ -972,5 +971,22 @@ exports.onDeletNotification=async(req,res)=>{
         console.log(error)
     }
 
+
+}
+
+exports.onFetchUserDebitCardDetails=async(req,res)=>{
+    const userID=req.userID
+    try {
+       const isUser=await users.findOne({_id:userID})
+        let debitCardDetails={
+            accno:isUser.debitCard.accountNumber,
+            cvv:isUser.debitCard.cvv
+        }
+        console.log(debitCardDetails)
+        res.status(200).json(debitCardDetails)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json(error)
+    }
 
 }

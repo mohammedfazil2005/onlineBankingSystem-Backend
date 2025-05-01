@@ -37,7 +37,7 @@ userRouter.patch('/payfullamount/loan',tokenAuthentication,userController.onPayF
 userRouter.patch('/payfullamount/otp/:id',tokenAuthentication,userController.onPayFullLoanAmountOTP)
 
 userRouter.delete('/deleteNotification/:id',tokenAuthentication,userController.onDeletNotification)
-
+userRouter.get('/fetchdebitcard',tokenAuthentication,userController.onFetchUserDebitCardDetails)
 
 
 module.exports = userRouter
